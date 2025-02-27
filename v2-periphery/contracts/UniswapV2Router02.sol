@@ -49,6 +49,7 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
         (uint reserveA, uint reserveB) = UniswapV2Library.getReserves(factory, tokenA, tokenB);
         if (reserveA == 0 && reserveB == 0) {
             // ペアの保有量がそれぞれゼロなら希望量をすべて入れる
+            // 最初の流動性プール作成者は、トークン比率を自由に決めることができる
             (amountA, amountB) = (amountADesired, amountBDesired);
         } else {
             // ペアがどちらもゼロでなければ、ペアの保有量からamountBの最適なトークン量を計算する（x * y = k）
