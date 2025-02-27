@@ -14,7 +14,7 @@ library UniswapV2Library {
         require(token0 != address(0), 'UniswapV2Library: ZERO_ADDRESS');
     }
 
-    // calculates the CREATE2 address for a pair without making any external calls
+    // ペアコントラクトのCREATE2アドレスを引数から算出するメソッド
     function pairFor(address factory, address tokenA, address tokenB) internal pure returns (address pair) {
         (address token0, address token1) = sortTokens(tokenA, tokenB);
         pair = address(uint(keccak256(abi.encodePacked(
@@ -32,10 +32,12 @@ library UniswapV2Library {
         (reserveA, reserveB) = tokenA == token0 ? (reserve0, reserve1) : (reserve1, reserve0);
     }
 
-    // given some amount of an asset and pair reserves, returns an equivalent amount of the other asset
+    // あるトークンが与えられたときに、現在のリザーブ比率に基づいてもう片方のトークンの等価な金額を返す
     function quote(uint amountA, uint reserveA, uint reserveB) internal pure returns (uint amountB) {
         require(amountA > 0, 'UniswapV2Library: INSUFFICIENT_AMOUNT');
         require(reserveA > 0 && reserveB > 0, 'UniswapV2Library: INSUFFICIENT_LIQUIDITY');
+        // amountA / amountB = reserveA / reserveB
+        // 現在のリザーブの比率でトークンペアを計算
         amountB = amountA.mul(reserveB) / reserveA;
     }
 
@@ -48,7 +50,6 @@ library UniswapV2Library {
         uint denominator = reserveIn.mul(1000).add(amountInWithFee);
         amountOut = numerator / denominator;
     }
-
     // given an output amount of an asset and pair reserves, returns a required input amount of the other asset
     function getAmountIn(uint amountOut, uint reserveIn, uint reserveOut) internal pure returns (uint amountIn) {
         require(amountOut > 0, 'UniswapV2Library: INSUFFICIENT_OUTPUT_AMOUNT');

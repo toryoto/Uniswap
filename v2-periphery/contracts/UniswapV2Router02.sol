@@ -88,6 +88,7 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
         // 流動性トークンをtoに発行
         liquidity = IUniswapV2Pair(pair).mint(to);
     }
+    // ETHを含むペアの流動性を提供するメソッド
     function addLiquidityETH(
         address token,
         uint amountTokenDesired,
@@ -96,6 +97,7 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
         address to,
         uint deadline
     ) external virtual override payable ensure(deadline) returns (uint amountToken, uint amountETH, uint liquidity) {
+        // 最適なERC20トークンとETHの量を取得する
         (amountToken, amountETH) = _addLiquidity(
             token,
             WETH,
@@ -106,10 +108,12 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
         );
         address pair = UniswapV2Library.pairFor(factory, token, WETH);
         TransferHelper.safeTransferFrom(token, msg.sender, pair, amountToken);
+        // ERC20トークンにしないと流動性の提供ができないのでETHをWETHにラップする
         IWETH(WETH).deposit{value: amountETH}();
-        assert(IWETH(WETH).transfer(pair, amountETH));
+        assert(IWETH(WETH).transfer(pair, amountETH)); // 流動性プールにWETHが送金できてることを保証する
+        // 流動性トークンをtoに発行
         liquidity = IUniswapV2Pair(pair).mint(to);
-        // refund dust eth, if any
+        // 実際に送った金額と流動性提供した金額に差がある場合は返金する
         if (msg.value > amountETH) TransferHelper.safeTransferETH(msg.sender, msg.value - amountETH);
     }
 
