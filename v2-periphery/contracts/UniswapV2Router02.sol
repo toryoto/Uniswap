@@ -228,18 +228,27 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
 
     // **** SWAP ****
     // requires the initial amount to have already been sent to the first pair
+    // パス内の各トークンペアを順に処理してスワップを実行する
+    // 例：USDC → WETH → DAI
+    // 複数のトークンを経由するスワップ（マルチホップスワップ）が可能になる。例えば、直接的なペアが存在しないトークン同士でも、WETHなどの流動性の高いトークンを経由してスワップできる
     function _swap(uint[] memory amounts, address[] memory path, address _to) internal virtual {
         for (uint i; i < path.length - 1; i++) {
+            // 現在のステップでの入力トークンと出力トークンを特定
             (address input, address output) = (path[i], path[i + 1]);
+            // Uniswapのペアでは、トークンはアドレスの大小関係で順序付けられてるのでソート
             (address token0,) = UniswapV2Library.sortTokens(input, output);
             uint amountOut = amounts[i + 1];
             (uint amount0Out, uint amount1Out) = input == token0 ? (uint(0), amountOut) : (amountOut, uint(0));
+            // 最後のスワップでなければ次のペアコントラクトに送金し、最後のスワップなら指定された_toアドレスに送金する
             address to = i < path.length - 2 ? UniswapV2Library.pairFor(factory, output, path[i + 2]) : _to;
+            // 実際にswap実行する（pathによっては複数回）
             IUniswapV2Pair(UniswapV2Library.pairFor(factory, input, output)).swap(
                 amount0Out, amount1Out, to, new bytes(0)
             );
         }
     }
+    // 正確な量の入力トークンを使用して、最小量の出力トークンを購入するための関数
+    // 例：100 DAIをすべてETHに変えたい
     function swapExactTokensForTokens(
         uint amountIn,
         uint amountOutMin,
@@ -247,11 +256,16 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
         address to,
         uint deadline
     ) external virtual override ensure(deadline) returns (uint[] memory amounts) {
+        // swapするトークンの出力金額を事前に予測し計算
         amounts = UniswapV2Library.getAmountsOut(factory, amountIn, path);
+        // 予測の金額が最低出力額より大きいことを担保する
         require(amounts[amounts.length - 1] >= amountOutMin, 'UniswapV2Router: INSUFFICIENT_OUTPUT_AMOUNT');
+        // swap予定のトークンをペアcontractへ送金する
+        // Pairのswap関数は内部で「既にペアコントラクトが必要なトークンを受け取っていること」を前提としているため
         TransferHelper.safeTransferFrom(
             path[0], msg.sender, UniswapV2Library.pairFor(factory, path[0], path[1]), amounts[0]
         );
+        // swap処理
         _swap(amounts, path, to);
     }
     function swapTokensForExactTokens(
