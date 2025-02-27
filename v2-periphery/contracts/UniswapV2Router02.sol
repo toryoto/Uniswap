@@ -9,11 +9,13 @@ import './libraries/SafeMath.sol';
 import './interfaces/IERC20.sol';
 import './interfaces/IWETH.sol';
 
+// ユーザとUniswap V2のインターフェース
+// ユーザはこのコントラクトを介してSwapを行う
 contract UniswapV2Router02 is IUniswapV2Router02 {
     using SafeMath for uint;
 
-    address public immutable override factory;
-    address public immutable override WETH;
+    address public immutable override factory; // ペアファクトリーのアドレス
+    address public immutable override WETH; // WETHのアドレス
 
     modifier ensure(uint deadline) {
         require(deadline >= block.timestamp, 'UniswapV2Router: EXPIRED');
@@ -30,6 +32,7 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
     }
 
     // **** ADD LIQUIDITY ****
+    // ユーザが提供するトークンのどちらかが上限の量（desired量）で流動性に提供され、もう片方はその上限の量に基づいてx * y = kから決まる
     function _addLiquidity(
         address tokenA,
         address tokenB,
@@ -38,40 +41,51 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
         uint amountAMin,
         uint amountBMin
     ) internal virtual returns (uint amountA, uint amountB) {
-        // create the pair if it doesn't exist yet
+        // 流動性を追加しようとしているペアが存在してなかったら新しくペアを作成
         if (IUniswapV2Factory(factory).getPair(tokenA, tokenB) == address(0)) {
             IUniswapV2Factory(factory).createPair(tokenA, tokenB);
         }
+        // 対象のペアの保有量を取得
         (uint reserveA, uint reserveB) = UniswapV2Library.getReserves(factory, tokenA, tokenB);
         if (reserveA == 0 && reserveB == 0) {
+            // ペアの保有量がそれぞれゼロなら希望量をすべて入れる
             (amountA, amountB) = (amountADesired, amountBDesired);
         } else {
+            // ペアがどちらもゼロでなければ、ペアの保有量からamountBの最適なトークン量を計算する（x * y = k）
             uint amountBOptimal = UniswapV2Library.quote(amountADesired, reserveA, reserveB);
             if (amountBOptimal <= amountBDesired) {
                 require(amountBOptimal >= amountBMin, 'UniswapV2Router: INSUFFICIENT_B_AMOUNT');
-                (amountA, amountB) = (amountADesired, amountBOptimal);
+                (amountA, amountB) = (amountADesired, amountBOptimal); // Aがユーザの希望量でBはアルゴリズムに基づいて決定
             } else {
+                // amountBOptimalのトークン量が希望するトークン量より小さい場合は
+                // ペアの保有量からamountAの最適なトークン量を計算する
                 uint amountAOptimal = UniswapV2Library.quote(amountBDesired, reserveB, reserveA);
-                assert(amountAOptimal <= amountADesired);
+                assert(amountAOptimal <= amountADesired); // assertは括弧内の条件がtrueであることを"断言"する
                 require(amountAOptimal >= amountAMin, 'UniswapV2Router: INSUFFICIENT_A_AMOUNT');
-                (amountA, amountB) = (amountAOptimal, amountBDesired);
+                (amountA, amountB) = (amountAOptimal, amountBDesired); // Bがユーザの希望量でAはアルゴリズムに基づいて決定
             }
         }
     }
+    // トークンペアに流動性を提供するメソッド
     function addLiquidity(
-        address tokenA,
-        address tokenB,
-        uint amountADesired,
-        uint amountBDesired,
-        uint amountAMin,
-        uint amountBMin,
-        address to,
-        uint deadline
+        address tokenA, // 1つ目のERC20トークンのアドレス
+        address tokenB, // 2つ目のERC20トークンのアドレス
+        uint amountADesired, // 流動性に提供したいトークンAの数量
+        uint amountBDesired, // 流動性に提供したいトークンAの数量
+        uint amountAMin, // 提供するトークンAの最小数量。スリッページを考慮に入れた値。
+        uint amountBMin, // 提供するトークンBの最小数量。スリッページを考慮に入れた値。
+        address to, // LPトークンを受け取るアドレス
+        uint deadline //トランザクションの有効期限
     ) external virtual override ensure(deadline) returns (uint amountA, uint amountB, uint liquidity) {
+        // 引数を全て渡して最適なトークンの量を算出する
         (amountA, amountB) = _addLiquidity(tokenA, tokenB, amountADesired, amountBDesired, amountAMin, amountBMin);
+        // ペアトークンのアドレスを予測し取得
         address pair = UniswapV2Library.pairFor(factory, tokenA, tokenB);
+        // tokenAをペアcontractへ送る
         TransferHelper.safeTransferFrom(tokenA, msg.sender, pair, amountA);
+        // tokenBをペアcontractへ送る
         TransferHelper.safeTransferFrom(tokenB, msg.sender, pair, amountB);
+        // 流動性トークンをtoに発行
         liquidity = IUniswapV2Pair(pair).mint(to);
     }
     function addLiquidityETH(
@@ -400,6 +414,7 @@ contract UniswapV2Router02 is IUniswapV2Router02 {
     }
 
     // **** LIBRARY FUNCTIONS ****
+    // x*y=kの基づいてSwapの量を取得するメソッド群
     function quote(uint amountA, uint reserveA, uint reserveB) public pure virtual override returns (uint amountB) {
         return UniswapV2Library.quote(amountA, reserveA, reserveB);
     }

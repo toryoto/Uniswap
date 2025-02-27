@@ -8,6 +8,8 @@ import './interfaces/IERC20.sol';
 import './interfaces/IUniswapV2Factory.sol';
 import './interfaces/IUniswapV2Callee.sol';
 
+// AMMを実現するためのコントラクト
+// トークンペアの操作をする
 contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
     using SafeMath  for uint;
     using UQ112x112 for uint224;
@@ -62,7 +64,8 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
         factory = msg.sender;
     }
 
-    // called once by the factory at time of deployment
+    // Factoryコントラクトによってデプロイされる際に一度だけ呼ばれる
+    // ペアコントラクトのデプロイ後に、各ペアごとに独自の初期設定を行うことができるようになる
     function initialize(address _token0, address _token1) external {
         require(msg.sender == factory, 'UniswapV2: FORBIDDEN'); // sufficient check
         token0 = _token0;
